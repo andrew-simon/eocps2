@@ -1,14 +1,22 @@
 ---
 title: "Problem Set 2"
-output: html_document
-date: `r lubridate::today()`
-author: 'Andrew Simon'
+author: "Andrew Simon"
+date: "April 26, 2021"
+output: pdf_document
+urlcolor: blue
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(knitr)
+library(fastDummies)
+library(gridExtra)
 ```
+
+#### Submission guide
+
+This .pdf is meant to provide every answer necessary to complete this assignment. I did not include any code as I didn't think it was necessary, but it can be found in this [github repository](https://github.com/andrew-simon/eocps2). All of the data is also included in the repository. Any questions about the assignment can be emailed to me at awsimon@uchicago.edu, or may be answered in the github readme.
 
 ## Question 1
 
@@ -38,11 +46,12 @@ Describe a “natural experiment” research design based on law changes that yo
 
 #### Response
 
-I will use state-level accident data from the National Highway Traffic Safety Administration ([NHTSA](https://www.nhtsa.gov/content/nhtsa-ftp/251)) manually paired with legalization data from multiple sources (mainly this [wikipedia](https://en.wikipedia.org/wiki/Timeline_of_cannabis_laws_in_the_United_States) page, which I confirmed is accurate). I coded this legalization data into a .csv file which can be viewed [here](https://github.com/andrew-simon/eocps2/blob/main/weeddata.csv).
+I will use state-level accident data from the National Highway Traffic Safety Administration ([NHTSA](https://www.nhtsa.gov/content/nhtsa-ftp/251)) manually paired with legalization data from multiple sources (mainly this [wikipedia](https://en.wikipedia.org/wiki/Timeline_of_cannabis_laws_in_the_United_States) page, which I confirmed is accurate). I coded this legalization data into a .csv file which can be viewed [here](https://github.com/andrew-simon/eocps2/blob/main/weeddata.csv). I used population data from the census (found in git repo) from 2010-2019. The 2010 start provides 3 years of data before treatment (because treatment is delayed until a year after the passage of legalization policy), and was the most consise and accurate data 
+I could find. There is limited need for older data.
 
-Based on these law changes, I ran a regression of crash fatalities per 100,000 citizens on the number of years post-legalization, with a one year floor. Dummy variables were included for every year and every state to control for state and time effects. Additionally, decriminalization and legal medical use were controlled for. This multiple linear regression returned a coefficient of 0.25496 more crash fatalities per year of legalization per 100,000 citizens. This coefficient is associated with a standard error of 0.08817 and a p value of .00402, making it significant at the 0.01 level. A full summary of the model is included below this response. This regression involved all states.
+I will use these law changes to regress the annual number of car crash fatalities on the number of years a legalization law has been in place. The null hypothesis would correspond to 0 change with an alternative hypothesis of any impact.
 
-After reviewing some data on the number of dispensaries open in each state after legalization, I decided the floor for treatment should be 1 year. The number of dispensaries increases significantly after the one year threshold. Additionally, legalization legislation often involves a delay, meaning that the time coded for this regression is likely before the full real-world increase in smoking that occurs as a result of legalization. For this reason, these estimates can be considered a conservative estimate of the imapct of smoking on crashes.
+After reviewing some data on the number of dispensaries open in each state after legalization, I decided the floor for treatment should be 1 year. The number of dispensaries increases significantly after the one year threshold. Additionally, legalization legislation often involves a delay, meaning that the time coded for this regression is likely before the full real-world increase in smoking that occurs as a result of legalization. For this reason, these estimates can be considered a conservative estimate of the impact of smoking on crashes.
 
 ## Question 3
 
@@ -50,10 +59,16 @@ Collect data at the state-year level on the legal status of marijuana and on tra
 
 #### Response
 
-```{r data cleanup, warning=FALSE, include=false}
+Here I import the data from the NHTSA, the Census Bureau, and my own hard coded data about weed legalization. The code for these imports can be found in the .Rmd file in the [git repo](https://github.com/andrew-simon/eocps2/blob/main/eocps2.Rmd) for this assignment.  
+
+From looking at these charts, it seems as though a small but potentially significant increase in fatalities could be linked to the increase in population living under legal weed from 2014-2016. The delay in actual changes in weed use after legalization complicates this intial hypothesis. It is also worth noting that states who have approved legal weed currently have much lower crash fatalities per 100,000 people. This significant difference will limit the external validity of the results of this natural experiment.
+
+```{r data cleanup, echo = F , message = F , warning = F}
+# importing my self-coded data on weed legalization
 weeddata <- read_csv('weeddata.csv') %>%
   rename('USPS' = 'USPS Code')
 
+# this function helps format the raw data into a tidy data format
 cleanup <-function(x , y) {
   accident_y <- read_csv(x) %>%
     mutate(index = 1) %>%
@@ -63,6 +78,7 @@ cleanup <-function(x , y) {
     return(accident_y)
 }
 
+# to help rename the files
 frames2 <- tribble(
   ~name , ~year , ~df ,
   'ACCIDENT2006.CSV' , 2006 , 'accident2006' , 
@@ -81,25 +97,94 @@ frames2 <- tribble(
   'accident2019.CSV' , 2019 , 'accident2019'  
 )
 
+#applying the cleanup function to the raw data
 datalist <- map2(frames2$name , frames2$year , cleanup)
 
+#renames data
 names(datalist) <- frames2$df
+# brings new dataframes into the global environment
 list2env(datalist , envir = .GlobalEnv)
 
+#imports population data from the census
 pop_data <- read_csv('pop_data.csv') 
 ```
-```{r visuals}
+```{r visuals , include = F}
+#bind together dataframes to create a single dataframe with everything necessary
+
 accidents <- rbind(accident2006 , accident2007 , accident2008 , accident2009 , accident2010 ,accident2011 , accident2012 , 
                    accident2013 , accident2014, accident2015 , accident2016 , accident2017 , accident2018 , accident2019)
 
+# creates a dataframe for plotting
 weed_chart <- inner_join(accidents , weeddata , by = c('STATE' , 'year')) %>%
-  group_by(LEGAL, YEAR) %>%
-  mutate(fatals_pc = (fatals/pop)*100000) %>%
+  inner_join(pop_data , by = c('STATE' , 'year')) %>% 
+  mutate(years2legal = legal_year - year) %>%
+  mutate(treated_legal = ifelse(is.na(legal_year) == T , 0 , 1)) %>%
+  group_by(treated_legal, year) %>%
+  summarise(fatals = sum(fatals), crashes = sum(crashes) , drunks=sum(drunks) , pop=sum(pop)) %>%
+  mutate(fatals_pc = (fatals/pop)*100000 , drunks_pc = (drunks/pop)*100000 , crashes_pc = (crashes/pop)*100000) %>%
+  mutate(Legality = ifelse(treated_legal == 1 , 'Treatment' , 'Control'))
 
+kable(weed_chart  , col.names = c('Treatment Dummy' , 'Year' , 'Fatalities' , 'Crashes' , 'DUI Crashes' , 'Total Population of Group' , 'Fatalities per 100,000' , 'DUI crashes per 100,000' , 'Crashes per 100,000' , 'Group') , caption = 'Summary Statistics')
 ```
+```{r plot , echo = F , message = F}
+#identical to later code needed later for the linear model, but included here to plot
+weed_accidents <- inner_join(accidents , weeddata , by = c('STATE' , 'year')) %>%
+  inner_join(pop_data , by = c('STATE' , 'year')) %>%
+  mutate(years2legal = legal_year - year) %>%
+  mutate(fatals_pc = (fatals/pop)*100000) %>%
+  dummy_cols(select_columns = c('STATE' , 'year')) %>%
+  mutate(treated_legal = ifelse(is.na(years2legal) == F , 1 , 0)) %>%
+  mutate(yearsafter = case_when(year-legal_year > 0 ~ year-legal_year , 
+                                year-legal_year <= 0 ~ 0 ,
+                                is.na(legal_year) ~ 0))
+# creates a dataframe with the population that lives with legal weed in any one year
+weedpop <- weed_accidents %>%
+  group_by(year , LEGAL) %>%
+  summarise(pop = sum(pop)) %>%
+  filter(LEGAL == 1)
+
+# creates a dataframe with the population that lives without legal weed in any one year
+pop <- weed_accidents %>%
+  group_by(year , LEGAL) %>%
+  summarise(pop = sum(pop)) %>%
+  filter(LEGAL == 0)
+
+# creates a dataframe to calcuate the proportion of U.S. that lives w legal weed
+proppop <- inner_join(weedpop , pop , by = 'year') %>%
+  mutate(propweed = pop.x/pop.y)
+
+ggplot() +
+  geom_line(data = filter(weed_chart , treated_legal == 0) , aes(x = year , y = fatals_pc , color = Legality)) +
+  geom_line(data = filter(weed_chart, treated_legal ==1) , aes(x = year , y = fatals_pc , color = Legality)) + 
+  labs(y = 'Crash Fatalities per 100,000' ,
+       x = 'year' , 
+       title = 'Crash Fatalities and Legal Weed') + 
+  scale_x_continuous(breaks = c(2010 , 2012 , 2014 , 2016 , 2018)) + 
+  theme_minimal()
+```
+
+```{r plot2 , echo = F}
+ggplot() + 
+  geom_line(data = proppop , aes(x = year , y = propweed)) +
+   scale_x_continuous(breaks = c(2012 , 2014 , 2016 , 2018)) +
+  labs(title = 'Proportion of the U.S. living in a state with legal weed' ,
+      x = 'Year' ,
+      y = 'Proportion') +
+  theme_minimal()
+```
+
+## Question 4
+
+Using the research design in question 2 and the data collected in question 3, come up with an estimate of the causal impact of marijuana legalization on traffic fatalities. Please provide both a point estimate and a standard error. Explain whether you think the magnitude of your estimate is large or small.
+
+### Response
+ 
+Based on these law changes, I ran a regression of crash fatalities per 100,000 citizens on the number of years post-legalization, with a one year floor. Dummy variables were included for every year and every state to control for state and time effects. Additionally, decriminalization and legal medical use were controlled for. This multiple linear regression returned a coefficient of 0.25496 more crash fatalities per year of legalization per 100,000 citizens. This coefficient is associated with a standard error of 0.08817 and a p value of .00402, making it significant at the 0.01 level. A full summary of the model is included below this response. This regression involved all states.
+
+In 2019, the highest crash fatalities rate per 100,000 was 25.5 in Wyoming, while the lowest was 3.28 in Washington, DC. Given the positive impact of ~0.26 per year, this is fairly significant today. What makes this finding even more significant, however, is the potential impact for this number of deaths to grow. There is not enough data currently to fully understand the impact of legal weed on smoking and driving habits, but it seems safe to assume that fatal crashes will increase with weed smoking as legality increases nation wide.
+
+Additionally, while this 0.26 per 100,000 number may not sound large immediately, it is worth considering in context. In California, a state with legal weed, there were [9.1 crash deaths](https://www.iihs.org/topics/fatality-statistics/detail/state-by-state) per 100,000 people or around 3,595 people. If this 0.26 per 100,000 increase were to happen next year (which is a much stronger outcome of this analysis than I support but a valuable exercise), 3,698 people will die traffic deaths, in increase of around 100 people. This is an immensely high cost of legalization. 
 ```{r modeling}
-
-
 weed_accidents <- inner_join(accidents , weeddata , by = c('STATE' , 'year')) %>%
   inner_join(pop_data , by = c('STATE' , 'year')) %>%
   mutate(years2legal = legal_year - year) %>%
@@ -110,13 +195,39 @@ weed_accidents <- inner_join(accidents , weeddata , by = c('STATE' , 'year')) %>
                                 year-legal_year <= 0 ~ 0 ,
                                 is.na(legal_year) ~ 0))
 
-reg1 <- lm(fatals_pc ~ yearsafter +  DCRIM + MED + STATE_1    +   STATE_2       + STATE_4    +   STATE_5    +  
-               STATE_6  +  STATE_8 +  STATE_9 + STATE_10 +STATE_11+   +   STATE_12 +     STATE_13   +   STATE_15   +   STATE_16   +   STATE_17   +   STATE_18 +
-             STATE_19  +    STATE_20  +  STATE_21  +    STATE_22  +    STATE_23  +    STATE_24  +    STATE_25  +  STATE_26  +
-              STATE_27  +    STATE_28  +    STATE_29  +    STATE_30  +    STATE_31  +    STATE_32  +    STATE_33  +    STATE_34  +
-              STATE_35  +    STATE_36  +    STATE_37  +    STATE_38  +    STATE_39  +  STATE_40  +    STATE_41    +  STATE_42  +
-              STATE_44    +  STATE_45  +    STATE_46  +    STATE_47+    STATE_48  +    STATE_49  +    STATE_50    +  STATE_51  +
-              STATE_53+    STATE_54  +    STATE_55+    STATE_56  +    year_2010   +  year_2011   +  year_2012 +    year_2013 +   
-               year_2014 + year_2015 +year_2016 + year_2017 + year_2018 + year_2019 , data = weed_accidents)
+reg1 <- lm(fatals_pc ~ yearsafter +  DCRIM + MED + STATE_1 + STATE_2 + STATE_4  
+           +  STATE_5    +  STATE_6  +  STATE_8 +  STATE_9 + STATE_10 + 
+            STATE_11 + STATE_12 +  STATE_13   +  STATE_15   +   STATE_16   +  
+            STATE_17   +   STATE_18 + STATE_19  +    STATE_20  +  STATE_21  +    
+            STATE_22  +    STATE_23  +    STATE_24  +    STATE_25  +  STATE_26+
+            STATE_27  +    STATE_28  +    STATE_29  +    STATE_30  +    
+            STATE_31  +    STATE_32  +    STATE_33  +    STATE_34  +
+            STATE_35  +    STATE_36  +    STATE_37  +    STATE_38  +  
+            STATE_39  +  STATE_40  +    STATE_41    +  STATE_42  +
+            STATE_44    +  STATE_45  +    STATE_46  +    STATE_47+  
+             STATE_48  +    STATE_49  +    STATE_50    +  STATE_51  +
+            STATE_53+    STATE_54  +    STATE_55+    STATE_56  +    
+            year_2010   +  year_2011   +  year_2012 +    year_2013 +   
+            year_2014 + year_2015 +year_2016 + year_2017 + year_2018 + 
+            year_2019 , data = weed_accidents)
 summary(reg1)
 ```
+
+## Question 5
+
+Discuss the public policy implication of your finding, and what your results say about the theories in question 1.
+
+### Response
+
+There are several potential policy responses to the positive causal impact legal smoking has on crash fatalities. With the significant funding that can be provided through taxes on legal marijuana, many of these responses are feasible and could have a significant impact in decreasing crash fatalities that result due to high driving and those that do not.
+
+First, expanding and increasing the requirements of driver's education programs in states where weed is legal could help prevent these crashes. By explaining to new drivers the risks of high driving (as we explain the risk of drunk driving), policy makers could begin to dispel the myth that smoking does not inhibit driving ability. This policy change is easily implementable and cost effective.
+
+Second, policy makers should consider expanding funding for highway patrols. There is a strong correlation between driving speed and fatality risk. By directing funding toward highway patrols, municipalities and states can help mitigate the riskiest high driving. Technologies like speed cameras and radar guns could assist significantly in preventing fatalities that result from high driving. The CDC [reports](https://www.cdc.gov/mmwr/volumes/68/wr/mm6850a1.htm) that high driving increases at night time. Through an expansion of night-time highway patrol, the likelihood of being caught and punished for risky driving increases and this will help deter bad behavior.
+
+Third, the CDC and U.S. government should invest significantly in more effective methods of measuring weed inhibition. Currently, there are ineffective and subjective ways of measuring intoxication from marijuana. This not only decreases the likelihood an individual is punished for driving high, it also increases individual police officers discretion when acting in high driving situations. A widely-publicized and highly-effective 'weed breathalyzer' would deter drivers from smoking before getting behind the wheel.
+
+Like any policy, legalizing marijuana has trade offs. This increase in driving deaths, while negative, must be considered in context with the benefits of legalizing weed. Thinking strictly in terms of finances, which is to ignore the injustices of criminalizing marijuana, tax revenue from weed likely offsets the social cost of driving deaths completely. For an additional ~100 road deaths, California earned [1.8 billion dollars](https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&cad=rja&uact=8&ved=2ahUKEwj_hML2vZ3wAhUCbs0KHbMqAcYQFjABegQIAxAD&url=https%3A%2F%2Fwww.greenentrepreneur.com%2Farticle%2F361617&usg=AOvVaw3zKMjmtvl1afZEJfgPZz6t) in tax revenue. This is a high number of deaths that has to be seriously considered seriously when proposing legalization policies. 
+
+
+
