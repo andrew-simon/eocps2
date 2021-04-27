@@ -1,0 +1,122 @@
+---
+title: "Problem Set 2"
+output: html_document
+date: `r lubridate::today()`
+author: 'Andrew Simon'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Question 1
+
+Theorize on a variety of possible causal channels via which marijuana legalization might lead to more or fewer driving fatalities. For each causal channel, guesstimate a plausible sign and magnitude of the impact of the channel. Obviously, you are just speculating here using common sense and back of the envelope calculations.
+
+#### Response
+
+There are several causal channels through which maraijuana legalization could shift driving outcomes. 
+
+##### 1) Legalization increases marijuana use and therefore impaired driving
+
+Increased use of marijuana would increase driving fatalities through the mechanism of impairment. If marijuana does in fact impair driver and make them more likely to crash, increased use would lead to increased fatalities. Threats to this channel's viability are if legalization does not increase use and if weed does not impair driving ability.
+
+I am fairly confident this is the most likely source of increased driving fatalities due to cannabis legalization. If we argue that the increase in driving deaths we have seen since 2012 is 100% due to legalization and impairment, we can take the difference of the 6 years post-2012 and the 2011 numbers and get a rough estimate of the imapct of impairment. In 2011 there were 10.42 driving deaths per 100,000 people in the US. From 2012-2018, the annual average number of driving deaths per 100,000 people was `r (10.75 + 10.40+10.28+11.06+11.59+11.40+11.18)/7`. So we estimate a positive impact of `r 10.9514-10.42` deaths per 100,000 people due to legalization. ([Source](https://en.wikipedia.org/wiki/Motor_vehicle_fatality_rate_in_U.S._by_year))
+
+##### 2) Legalization decreases drinking and driving
+
+For some, weed and alcohol are subsitutes. Legalization could lead to increased substitution from alcohol to weed as the cost of smoking weed (both the price and risk associated with smoking) potentially decreases with legalization. 
+
+[Data](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2722956/) on the danger of driving high are mixed, with some studies suggesting that high drivers are actually better when they are high compared to when they are sober. Despite mixed data, it is generally accepted (both in the literature and anecdotally) that driving high is safer than driving drunk. I doubt this hypothesis because while I believe that smoking and drinking are substitutes, I don't believe people who are driving drunk will substitute at a significant rate. Clearly they are committed to drinking. I also have observed anecdotally that some people who are willing to drive high are unwilling to drive drunk.
+
+[28%](https://www.cdc.gov/transportationsafety/impaired_driving/impaired-drv_factsheet.html) of traffic deaths involved drunk driving in 2016. To get an upper bound on potential impact lets say 100% of drunk driving crashes could be avoided if the driver were high instead of drunk. With those assumptions, 10,497 deaths would've been avoided in 2016 through substitution (`r 10497/37806*100`%).  
+
+## Question 2
+
+Describe a “natural experiment” research design based on law changes that you will implement using available data that you will collect. (Some things to think about: (a) there have been various versions of legalization/medical marijuana/decriminalization across states. Provide a compelling logic as to which state law changes have materially impacted the ability to obtain marijuana legally, (b) give some thought to timing... when do you think marijuana usage will increase relative to passage of relevant laws, and (c) justify your choice of a control group).
+
+#### Response
+
+I will use state-level accident data from the National Highway Traffic Safety Administration ([NHTSA](https://www.nhtsa.gov/content/nhtsa-ftp/251)) manually paired with legalization data from multiple sources (mainly this [wikipedia](https://en.wikipedia.org/wiki/Timeline_of_cannabis_laws_in_the_United_States) page, which I confirmed is accurate). I coded this legalization data into a .csv file which can be viewed [here](https://github.com/andrew-simon/eocps2/blob/main/weeddata.csv).
+
+Based on these law changes, I ran a regression of crash fatalities per 100,000 citizens on the number of years post-legalization, with a one year floor. Dummy variables were included for every year and every state to control for state and time effects. Additionally, decriminalization and legal medical use were controlled for. This multiple linear regression returned a coefficient of 0.25496 more crash fatalities per year of legalization per 100,000 citizens. This coefficient is associated with a standard error of 0.08817 and a p value of .00402, making it significant at the 0.01 level. A full summary of the model is included below this response. This regression involved all states.
+
+After reviewing some data on the number of dispensaries open in each state after legalization, I decided the floor for treatment should be 1 year. The number of dispensaries increases significantly after the one year threshold. Additionally, legalization legislation often involves a delay, meaning that the time coded for this regression is likely before the full real-world increase in smoking that occurs as a result of legalization. For this reason, these estimates can be considered a conservative estimate of the imapct of smoking on crashes.
+
+## Question 3
+
+Collect data at the state-year level on the legal status of marijuana and on traffic fatality death rates. NO OTHER CONTROL VARIABLES ARE NECESSARY. Make a summary statistics table, and also a graph showing how traffic deaths and the legal status of marijuana have evolved over time.
+
+#### Response
+
+```{r data cleanup, warning=FALSE, include=false}
+weeddata <- read_csv('weeddata.csv') %>%
+  rename('USPS' = 'USPS Code')
+
+cleanup <-function(x , y) {
+  accident_y <- read_csv(x) %>%
+    mutate(index = 1) %>%
+    group_by(STATE) %>%
+    summarise(crashes = sum(index) , fatals = sum(FATALS) , drunks = sum(DRUNK_DR)) %>%
+    mutate(year = y) %>%
+    return(accident_y)
+}
+
+frames2 <- tribble(
+  ~name , ~year , ~df ,
+  'ACCIDENT2006.CSV' , 2006 , 'accident2006' , 
+  'ACCIDENT2007.CSV' , 2007 , 'accident2007' , 
+  'ACCIDENT2008.CSV' , 2008 , 'accident2008' , 
+  'ACCIDENT2009.CSV' , 2009 , 'accident2009' , 
+  'ACCIDENT2010.CSV' , 2010 , 'accident2010' , 
+  'ACCIDENT2011.CSV' , 2011 , 'accident2011' , 
+  'ACCIDENT2012.CSV' , 2012 , 'accident2012' , 
+  'ACCIDENT2013.CSV' , 2013 , 'accident2013' , 
+  'ACCIDENT2014.CSV' , 2014 , 'accident2014' , 
+  'ACCIDENT2015.CSV' , 2015 , 'accident2015' , 
+  'accident2016.CSV' , 2016 , 'accident2016' , 
+  'accident2017.CSV' , 2017 , 'accident2017' , 
+  'accident2018.CSV' , 2018 , 'accident2018' , 
+  'accident2019.CSV' , 2019 , 'accident2019'  
+)
+
+datalist <- map2(frames2$name , frames2$year , cleanup)
+
+names(datalist) <- frames2$df
+list2env(datalist , envir = .GlobalEnv)
+
+pop_data <- read_csv('pop_data.csv') 
+```
+```{r visuals}
+accidents <- rbind(accident2006 , accident2007 , accident2008 , accident2009 , accident2010 ,accident2011 , accident2012 , 
+                   accident2013 , accident2014, accident2015 , accident2016 , accident2017 , accident2018 , accident2019)
+
+weed_chart <- inner_join(accidents , weeddata , by = c('STATE' , 'year')) %>%
+  group_by(LEGAL, YEAR) %>%
+  mutate(fatals_pc = (fatals/pop)*100000) %>%
+
+```
+```{r modeling}
+
+
+weed_accidents <- inner_join(accidents , weeddata , by = c('STATE' , 'year')) %>%
+  inner_join(pop_data , by = c('STATE' , 'year')) %>%
+  mutate(years2legal = legal_year - year) %>%
+  mutate(fatals_pc = (fatals/pop)*100000) %>%
+  dummy_cols(select_columns = c('STATE' , 'year')) %>%
+  mutate(treated_legal = ifelse(is.na(years2legal) == F , 1 , 0)) %>%
+  mutate(yearsafter = case_when(year-legal_year > 0 ~ year-legal_year , 
+                                year-legal_year <= 0 ~ 0 ,
+                                is.na(legal_year) ~ 0))
+
+reg1 <- lm(fatals_pc ~ yearsafter +  DCRIM + MED + STATE_1    +   STATE_2       + STATE_4    +   STATE_5    +  
+               STATE_6  +  STATE_8 +  STATE_9 + STATE_10 +STATE_11+   +   STATE_12 +     STATE_13   +   STATE_15   +   STATE_16   +   STATE_17   +   STATE_18 +
+             STATE_19  +    STATE_20  +  STATE_21  +    STATE_22  +    STATE_23  +    STATE_24  +    STATE_25  +  STATE_26  +
+              STATE_27  +    STATE_28  +    STATE_29  +    STATE_30  +    STATE_31  +    STATE_32  +    STATE_33  +    STATE_34  +
+              STATE_35  +    STATE_36  +    STATE_37  +    STATE_38  +    STATE_39  +  STATE_40  +    STATE_41    +  STATE_42  +
+              STATE_44    +  STATE_45  +    STATE_46  +    STATE_47+    STATE_48  +    STATE_49  +    STATE_50    +  STATE_51  +
+              STATE_53+    STATE_54  +    STATE_55+    STATE_56  +    year_2010   +  year_2011   +  year_2012 +    year_2013 +   
+               year_2014 + year_2015 +year_2016 + year_2017 + year_2018 + year_2019 , data = weed_accidents)
+summary(reg1)
+```
