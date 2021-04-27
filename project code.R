@@ -96,7 +96,7 @@ weed_change <- weed_accidents %>%
   mutate(legal_ch = ifelse(treated_legal == 1 , 'y' , 'n'))
 
 
-didreg <- lm(fatals_pc ~ yearsafter +  STATE_1    +   STATE_2       + STATE_4    +   STATE_5    +  
+reg <- lm(fatals_pc ~ yearsafter +  STATE_1    +   STATE_2       + STATE_4    +   STATE_5    +  
                STATE_6  +  STATE_8 +  STATE_9 + STATE_10 +STATE_11+   +   STATE_12 +     STATE_13   +   STATE_15   +   STATE_16   +   STATE_17   +   STATE_18 +
              STATE_19  +    STATE_20  +  STATE_21  +    STATE_22  +    STATE_23  +    STATE_24  +    STATE_25  +  STATE_26  +
               STATE_27  +    STATE_28  +    STATE_29  +    STATE_30  +    STATE_31  +    STATE_32  +    STATE_33  +    STATE_34  +
@@ -104,7 +104,7 @@ didreg <- lm(fatals_pc ~ yearsafter +  STATE_1    +   STATE_2       + STATE_4   
               STATE_44    +  STATE_45  +    STATE_46  +    STATE_47+    STATE_48  +    STATE_49  +    STATE_50    +  STATE_51  +
               STATE_53+    STATE_54  +    STATE_55+    STATE_56  +    year_2010   +  year_2011   +  year_2012 +    year_2013 +   
                year_2014 + year_2015 +year_2016 + year_2017 + year_2018 + year_2019 , data = weed_accidents)
-summary(didreg)
+summary(reg)
 
 ggplot(weed_change) +
   geom_line(aes(x = year , y = crashes_pct_chg , color = legal_ch)) 
@@ -115,4 +115,52 @@ summary(didreg)
 
 colNames <- colnames(weed_accidents)
 
+chart <- weed_accidents %>%
+  group_by(year) %>% 
+  filter(treated_legal == 1) %>%
+  summarize(fatals_pc = sum(fatals_pc))
 
+
+ggplot(chart) +
+  geom_line(aes(x = year , y = fatals_pc))
+
+
+estimates <- pop_data %>%
+  filter(year == 2019) %>%
+  mutate(newdeaths = pop/100000*0.25496) %>%
+  filter(STATE %in% c(8 , 53 , 6 , 23 , 25 , 32, 26 , 50 ,17))
+
+totpop <- tribble (
+  ~year , ~pop , 
+  2006 , 295593000 , 
+  2007 , 301580000 , 
+  2008 , 304375000 , 
+  2009 , 307007000 ,
+  2010 , 309330000 ,
+  2011 , 311583000 , 
+  2012 , 313129000 , 
+  2013 , 316113000 , 
+  2014 , 319113000 ,
+  2015 , 321442000 , 
+  2016 , 323100000 , 
+  2017 , 352719000 , 
+  2018 , 326687000 , 
+  2019 , 331449281
+)
+
+
+data <- accidents %>%
+  group_by(year) %>%
+  summarize(fatals = sum(fatals)) %>%
+  inner_join(totpop , by = 'year') %>%
+  mutate(fatals_pc = (fatals/pop)*100000)
+
+ggplot() +
+  geom_smooth(data = weed_accidents , mapping = aes(x = yearsafter , y = fatals_pc) , formula = fatals_pc ~ yearsafter + STATE_1    +   STATE_2       + STATE_4    +   STATE_5    +  
+                STATE_6  +  STATE_8 +  STATE_9 + STATE_10 +STATE_11+   +   STATE_12 +     STATE_13   +   STATE_15   +   STATE_16   +   STATE_17   +   STATE_18 +
+                STATE_19  +    STATE_20  +  STATE_21  +    STATE_22  +    STATE_23  +    STATE_24  +    STATE_25  +  STATE_26  +
+                STATE_27  +    STATE_28  +    STATE_29  +    STATE_30  +    STATE_31  +    STATE_32  +    STATE_33  +    STATE_34  +
+                STATE_35  +    STATE_36  +    STATE_37  +    STATE_38  +    STATE_39  +  STATE_40  +    STATE_41    +  STATE_42  +
+                STATE_44    +  STATE_45  +    STATE_46  +    STATE_47+    STATE_48  +    STATE_49  +    STATE_50    +  STATE_51  +
+                STATE_53+    STATE_54  +    STATE_55+    STATE_56  +    year_2010   +  year_2011   +  year_2012 +    year_2013 +   
+                year_2014 + year_2015 +year_2016 + year_2017 + year_2018 + year_2019)

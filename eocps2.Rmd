@@ -46,7 +46,7 @@ Describe a “natural experiment” research design based on law changes that yo
 
 #### Response
 
-I will use state-level accident data from the National Highway Traffic Safety Administration ([NHTSA](https://www.nhtsa.gov/content/nhtsa-ftp/251)) manually paired with legalization data from multiple sources (mainly this [wikipedia](https://en.wikipedia.org/wiki/Timeline_of_cannabis_laws_in_the_United_States) page, which I confirmed is accurate). I coded this legalization data into a .csv file which can be viewed [here](https://github.com/andrew-simon/eocps2/blob/main/weeddata.csv). I used population data from the census (found in git repo) from 2010-2019. The 2010 start provides 3 years of data before treatment (because treatment is delayed until a year after the passage of legalization policy), and was the most consise and accurate data 
+I will use state-level accident data from the National Highway Traffic Safety Administration ([NHTSA](https://www.nhtsa.gov/content/nhtsa-ftp/251)) manually paired with legalization data from multiple sources (mainly this [wikipedia](https://en.wikipedia.org/wiki/Timeline_of_cannabis_laws_in_the_United_States) page, which I confirmed is accurate). I coded this legalization data into a .csv file which can be viewed [here](https://github.com/andrew-simon/eocps2/blob/main/weeddata.csv). I used population data from the [Census Bureau](https://www.census.gov/data/datasets/time-series/demo/popest/2010s-state-total.html) from 2010-2019. The 2010 start provides 3 years of data before treatment (because treatment is delayed until a year after the passage of legalization policy), and was the most concise and accurate data 
 I could find. There is limited need for older data.
 
 I will use these law changes to regress the annual number of car crash fatalities on the number of years a legalization law has been in place. The null hypothesis would correspond to 0 change with an alternative hypothesis of any impact.
@@ -61,7 +61,7 @@ Collect data at the state-year level on the legal status of marijuana and on tra
 
 Here I import the data from the NHTSA, the Census Bureau, and my own hard coded data about weed legalization. The code for these imports can be found in the .Rmd file in the [git repo](https://github.com/andrew-simon/eocps2/blob/main/eocps2.Rmd) for this assignment.  
 
-From looking at these charts, it seems as though a small but potentially significant increase in fatalities could be linked to the increase in population living under legal weed from 2014-2016. The delay in actual changes in weed use after legalization complicates this intial hypothesis. It is also worth noting that states who have approved legal weed currently have much lower crash fatalities per 100,000 people. This significant difference will limit the external validity of the results of this natural experiment.
+From looking at these charts, it seems as though a small but potentially significant increase in fatalities could be linked to the increase in population living under legal weed from 2014-2016. The delay in actual changes in weed use after legalization complicates this intial hypothesis. It is also worth noting that states who have approved legal weed currently have much lower crash fatalities per 100,000 people. This  difference will limit the external validity of the results of this natural experiment. 
 
 ```{r data cleanup, echo = F , message = F , warning = F}
 # importing my self-coded data on weed legalization
@@ -213,6 +213,7 @@ reg1 <- lm(fatals_pc ~ yearsafter +  DCRIM + MED + STATE_1 + STATE_2 + STATE_4
 summary(reg1)
 ```
 
+\pagebreak 
 ## Question 5
 
 Discuss the public policy implication of your finding, and what your results say about the theories in question 1.
